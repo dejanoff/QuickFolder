@@ -1,11 +1,12 @@
 # QuickFolder - Agent Handoff Document
 
 ## Current Status
-- **Milestone 2 (v0.2.0) is 100% COMPLETE and fully operational.**
+- **Milestone 2 (v0.2.1) is 100% COMPLETE and fully operational.**
 - Clean native C++20 Win32 application compiled and linked statically with zero external runtime dependencies.
-- Inno Setup installer package built and tested (`QuickFolder-Setup-0.2.0.exe`).
+- Inno Setup installer package built and tested (`QuickFolder-Setup-0.2.1.exe`).
 - All 17 automated unit tests passing (`UnitTests.exe`).
 - Recent Folders MRU (6 clickable buttons), trash clear button (`🗑`), silent folder merge, and conflict auto-renaming implemented.
+- Universal context menu registration across `*` (all files), `Directory`, `Folder`, and `AllFilesystemObjects`.
 - Integration tests verified for single file, 20 files, 500 files, 1,000 files, mixed files and subfolders, `.lnk` shortcut files, Unicode (Cyrillic, German umlauts, emoji), long paths (> 260 characters), different parent directory rejection, existing destination handling, silent registration/unregistration, and clean uninstallation.
 - Zero orphan processes left behind after operation.
 
@@ -14,7 +15,7 @@
 ## What Works
 1. **Classic Explorer Context Menu Integration**:
    - COM Local Server (`DelegateExecute` pointing to `CLSID {4B2F7E41-8A19-4C1B-94E5-46D9B6E1C87D}`).
-   - Registered under `HKCU\Software\Classes\AllFilesystemObjects\shell\QuickFolder` and `Directory\shell\QuickFolder`.
+   - Registered under `HKCU\Software\Classes\*`, `Directory`, `Folder`, and `AllFilesystemObjects`.
    - `MultiSelectModel = "Document"` configured, allowing unlimited multi-selection.
 2. **Out-of-Process Execution**:
    - No DLL is injected into `explorer.exe`. Explorer stability is protected, no Explorer restart needed on update/uninstall.
@@ -59,14 +60,14 @@
 ---
 
 ## Last Successful Build
-- **Date**: 2026-09-30 (v0.2.0)
+- **Date**: 2026-09-30 (v0.2.1)
 - **Compiler**: Clang++ 22.1.8 (LLVM-MinGW UCRT x64, `-std=c++20 -static -O2 -mwindows -municode`)
 - **Resource Compiler**: windres 2.44
 - **Installer Compiler**: Inno Setup 6.7.3 (`ISCC.exe`)
 - **Unit Tests**: 17 Passed, 0 Failed
 - **Binaries**:
-  - `dist/QuickFolder.exe` (1,277,952 bytes)
-  - `dist/QuickFolder-Setup-0.2.0.exe` (2,360,749 bytes)
+  - `dist/QuickFolder.exe`
+  - `dist/QuickFolder-Setup-0.2.1.exe`
   - Installed binary at `%LOCALAPPDATA%\Programs\QuickFolder\QuickFolder.exe` updated and active.
 
 ---

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-09-30
+
+### Improved
+- **Universal Shell Registration**:
+  - Registered context menu verb under `Software\Classes\*` (all file types), `Software\Classes\Folder` (all folders), `Software\Classes\Directory` (filesystem folders), and `Software\Classes\AllFilesystemObjects` (universal mixed filesystem selections).
+  - Guarantees `Move to new folder...` / `In neuen Ordner verschieben...` appears consistently on any file type (documents, videos, archives, source files, executables, photos, etc.) and folders throughout Windows Explorer.
+
 ## [0.2.0] - 2026-09-30
 
 ### Added

@@ -311,8 +311,10 @@ HRESULT RegisterServer(bool perUser) {
         SetRegString(hRoot, verbKey + L"\\command", L"DelegateExecute", CLSID_QuickFolderCommand_String);
     };
 
+    RegisterVerb(L"Software\\Classes\\*");
     RegisterVerb(L"Software\\Classes\\AllFilesystemObjects");
     RegisterVerb(L"Software\\Classes\\Directory");
+    RegisterVerb(L"Software\\Classes\\Folder");
 
     // Notify Explorer of association change
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
@@ -323,8 +325,10 @@ HRESULT UnregisterServer(bool perUser) {
     HKEY hRoot = perUser ? HKEY_CURRENT_USER : HKEY_LOCAL_MACHINE;
 
     // Delete Context Menu verbs
+    RegDeleteTreeW(hRoot, L"Software\\Classes\\*\\shell\\QuickFolder");
     RegDeleteTreeW(hRoot, L"Software\\Classes\\AllFilesystemObjects\\shell\\QuickFolder");
     RegDeleteTreeW(hRoot, L"Software\\Classes\\Directory\\shell\\QuickFolder");
+    RegDeleteTreeW(hRoot, L"Software\\Classes\\Folder\\shell\\QuickFolder");
 
     // Delete COM CLSID
     std::wstring clsidKey = L"Software\\Classes\\CLSID\\" + std::wstring(CLSID_QuickFolderCommand_String);

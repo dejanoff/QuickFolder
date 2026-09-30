@@ -97,7 +97,7 @@ if (-not $SkipInstaller -and (Test-Path $isccPath)) {
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE"
     }
-    $setupItem = Get-Item "dist\QuickFolder-Setup-0.2.0.exe"
+    $setupItem = Get-Item "dist\QuickFolder-Setup-0.2.1.exe"
     Write-Host "Installer built successfully: $($setupItem.FullName) ($($setupItem.Length) bytes)" -ForegroundColor Green
 } else {
     Write-Host "`n[5/5] Skipping installer compilation." -ForegroundColor Gray
