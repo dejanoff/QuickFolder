@@ -20,7 +20,22 @@ void InitializeUI();
 // Shows the main native QuickFolder dialog
 bool ShowQuickFolderDialog(DialogParams& params);
 
-// Prompts the user when the target folder already exists
+// Conflict resolution choices when destination files already exist
+enum class ConflictResolution {
+    AutoRename,
+    Overwrite,
+    Cancel
+};
+
+// Prompts the user when one or more files in destination already exist
+ConflictResolution PromptFileConflict(HWND hwndOwner, size_t conflictCount, const std::wstring& sampleName);
+
+// Recent folders management (stored in registry, max 6 items)
+std::vector<std::wstring> GetRecentFolders();
+void AddRecentFolder(const std::wstring& folderName);
+void ClearRecentFolders();
+
+// Prompts the user when the target folder already exists (legacy fallback)
 FileOps::ExistingDestAction PromptExistingFolder(HWND hwndOwner, const std::wstring& folderName);
 
 // Shows a localized error message dialog

@@ -38,6 +38,16 @@ std::wstring GetFileName(const std::wstring& path);
 // Strips file extension
 std::wstring StripExtension(const std::wstring& filename);
 
+// Extracts file extension including dot (e.g. ".txt", or "" if none)
+std::wstring GetExtension(const std::wstring& filename);
+
+// Generates unique auto-renamed filename if collision exists (e.g. "name (2).ext", "name (3).ext")
+std::wstring GenerateUniqueName(
+    const std::wstring& destDir,
+    const std::wstring& srcPath,
+    const std::vector<std::wstring>& alreadyClaimedInBatch = {}
+);
+
 // Combines a directory path with a folder/file name
 std::wstring CombinePath(const std::wstring& dir, const std::wstring& subName);
 
@@ -52,6 +62,9 @@ std::wstring EnsureLongPathPrefix(const std::wstring& path);
 
 // Checks if path exists on the filesystem
 bool PathExists(const std::wstring& path);
+
+// Checks if path is an existing directory
+bool IsDirectory(const std::wstring& path);
 
 // Checks if directory is empty
 bool IsDirectoryEmpty(const std::wstring& path);

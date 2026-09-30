@@ -237,6 +237,59 @@ std::wstring StripExtension(const std::wstring& filename) {
     return filename.substr(0, lastDot);
 }
 
+std::wstring GetExtension(const std::wstring& filename) {
+    size_t lastDot = filename.rfind(L'.');
+    if (lastDot == std::wstring::npos || lastDot == 0) {
+        return L"";
+    }
+    return filename.substr(lastDot);
+}
+
+std::wstring GenerateUniqueName(
+    const std::wstring& destDir,
+    const std::wstring& srcPath,
+    const std::vector<std::wstring>& alreadyClaimedInBatch
+) {
+    std::wstring fileName = GetFileName(srcPath);
+    bool isDir = IsDirectory(srcPath);
+
+    std::wstring stem;
+    std::wstring ext;
+    if (isDir) {
+        stem = fileName;
+        ext = L"";
+    } else {
+        stem = StripExtension(fileName);
+        ext = GetExtension(fileName);
+    }
+
+    auto IsClaimed = [&](const std::wstring& name) {
+        for (const auto& claimed : alreadyClaimedInBatch) {
+            if (_wcsicmp(claimed.c_str(), name.c_str()) == 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // If destination does not have this file and not claimed in batch, original is unique
+    std::wstring originalTarget = CombinePath(destDir, fileName);
+    if (!PathExists(originalTarget) && !IsClaimed(fileName)) {
+        return fileName;
+    }
+
+    // Otherwise, generate candidate "stem (2).ext", "stem (3).ext", etc.
+    int counter = 2;
+    while (true) {
+        std::wstring candidate = stem + L" (" + std::to_wstring(counter) + L")" + ext;
+        std::wstring candidatePath = CombinePath(destDir, candidate);
+        if (!PathExists(candidatePath) && !IsClaimed(candidate)) {
+            return candidate;
+        }
+        counter++;
+    }
+}
+
 std::wstring CombinePath(const std::wstring& dir, const std::wstring& subName) {
     std::wstring normDir = NormalizePath(dir);
     if (normDir.empty()) return subName;
@@ -300,6 +353,13 @@ bool PathExists(const std::wstring& path) {
     std::wstring longPath = EnsureLongPathPrefix(path);
     DWORD attrib = GetFileAttributesW(longPath.c_str());
     return (attrib != INVALID_FILE_ATTRIBUTES);
+}
+
+bool IsDirectory(const std::wstring& path) {
+    std::wstring longPath = EnsureLongPathPrefix(path);
+    DWORD attrib = GetFileAttributesW(longPath.c_str());
+    if (attrib == INVALID_FILE_ATTRIBUTES) return false;
+    return (attrib & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 bool IsDirectoryEmpty(const std::wstring& path) {

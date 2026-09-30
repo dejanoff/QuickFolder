@@ -1,5 +1,6 @@
 #include "FileOperations.h"
 #include "PathUtils.h"
+#include "UI.h"
 
 namespace QuickFolder::FileOps {
 
@@ -27,6 +28,26 @@ MoveResult ExecuteMove(
         result.createdDirectory = destinationDirectory;
     }
 
+    // Check for collisions with existing files in destination directory
+    std::vector<std::wstring> conflictingNames;
+    for (const auto& srcPath : sourcePaths) {
+        std::wstring fileName = PathUtils::GetFileName(srcPath);
+        std::wstring destTargetPath = PathUtils::CombinePath(destinationDirectory, fileName);
+        if (PathUtils::PathExists(destTargetPath)) {
+            conflictingNames.push_back(fileName);
+        }
+    }
+
+    UI::ConflictResolution resolution = UI::ConflictResolution::AutoRename;
+    if (!conflictingNames.empty()) {
+        resolution = UI::PromptFileConflict(hwndOwner, conflictingNames.size(), conflictingNames[0]);
+        if (resolution == UI::ConflictResolution::Cancel) {
+            result.cancelled = true;
+            SafeCleanupCreatedDirectory(result.createdDirectory, destFolderAlreadyExisted);
+            return result;
+        }
+    }
+
     // CoCreate IFileOperation
     IFileOperation* pfo = nullptr;
     HRESULT hr = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_ALL, IID_PPV_ARGS(&pfo));
@@ -40,8 +61,11 @@ MoveResult ExecuteMove(
     // Configure flags:
     // FOF_ALLOWUNDO: Integrates with Windows Explorer Undo stack (Ctrl+Z)
     // FOF_NOCONFIRMMKDIR: Silent directory creation if needed
-    // FOF_NOCONFIRMATION: Do not prompt unnecessarily, but collision prompts remain active
+    // FOF_NOCONFIRMATION: Overwrite without redundant prompts if user chose Overwrite
     DWORD flags = FOF_ALLOWUNDO | FOF_NOCONFIRMMKDIR;
+    if (resolution == UI::ConflictResolution::Overwrite) {
+        flags |= FOF_NOCONFIRMATION;
+    }
     pfo->SetOperationFlags(flags);
     if (hwndOwner) {
         pfo->SetOwnerWindow(hwndOwner);
@@ -58,13 +82,27 @@ MoveResult ExecuteMove(
         return result;
     }
 
-    // Queue move for each source item
+    // Queue move for each source item, auto-renaming colliding items if requested
     size_t queuedCount = 0;
+    std::vector<std::wstring> batchClaimedNames;
+
     for (const auto& srcPath : sourcePaths) {
+        std::wstring fileName = PathUtils::GetFileName(srcPath);
+        std::wstring finalName = fileName;
+
+        if (resolution == UI::ConflictResolution::AutoRename) {
+            std::wstring destTargetPath = PathUtils::CombinePath(destinationDirectory, fileName);
+            if (PathUtils::PathExists(destTargetPath)) {
+                finalName = PathUtils::GenerateUniqueName(destinationDirectory, srcPath, batchClaimedNames);
+                batchClaimedNames.push_back(finalName);
+            }
+        }
+
         IShellItem* psiSource = nullptr;
         HRESULT hrItem = SHCreateItemFromParsingName(srcPath.c_str(), NULL, IID_PPV_ARGS(&psiSource));
         if (SUCCEEDED(hrItem) && psiSource) {
-            hrItem = pfo->MoveItem(psiSource, psiDest, NULL, NULL);
+            LPCWSTR pNewName = (finalName != fileName) ? finalName.c_str() : NULL;
+            hrItem = pfo->MoveItem(psiSource, psiDest, pNewName, NULL);
             if (SUCCEEDED(hrItem)) {
                 queuedCount++;
             }

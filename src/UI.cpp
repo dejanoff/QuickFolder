@@ -61,6 +61,13 @@ std::wstring GetString(UINT stringId) {
         case IDS_OPT_USE_EXISTING: return L"Использовать существующую папку";
         case IDS_OPT_CHOOSE_ANOTHER: return L"Выбрать другое имя";
         case IDS_FOLDER_SUFFIX: return L" - Папка";
+        case IDS_RECENT_FOLDERS_LABEL: return L"Недавние папки:";
+        case IDS_CLEAR_RECENT_TOOLTIP: return L"Очистить недавние";
+        case IDS_NO_RECENT_FOLDERS: return L"(нет недавних)";
+        case IDS_CONFLICT_TITLE: return L"Конфликт имён файлов";
+        case IDS_CONFLICT_PROMPT: return L"В целевой папке уже есть файлы с такими именами.";
+        case IDS_CONFLICT_RENAME_OPT: return L"Автоматически переименовать";
+        case IDS_CONFLICT_OVERWRITE_OPT: return L"Перезаписать";
         default: break;
         }
     } else if (lang == LANG_GERMAN) {
@@ -80,6 +87,13 @@ std::wstring GetString(UINT stringId) {
         case IDS_OPT_USE_EXISTING: return L"Vorhandenen Ordner verwenden";
         case IDS_OPT_CHOOSE_ANOTHER: return L"Anderen Namen wählen";
         case IDS_FOLDER_SUFFIX: return L" - Ordner";
+        case IDS_RECENT_FOLDERS_LABEL: return L"Zuletzt verwendet:";
+        case IDS_CLEAR_RECENT_TOOLTIP: return L"Verlauf leeren";
+        case IDS_NO_RECENT_FOLDERS: return L"(keine)";
+        case IDS_CONFLICT_TITLE: return L"Dateikonflikt erkannt";
+        case IDS_CONFLICT_PROMPT: return L"Im Zielordner sind bereits gleichnamige Dateien vorhanden.";
+        case IDS_CONFLICT_RENAME_OPT: return L"Automatisch umbenennen";
+        case IDS_CONFLICT_OVERWRITE_OPT: return L"Überschreiben";
         default: break;
         }
     }
@@ -101,6 +115,13 @@ std::wstring GetString(UINT stringId) {
     case IDS_OPT_USE_EXISTING: return L"Use existing folder";
     case IDS_OPT_CHOOSE_ANOTHER: return L"Choose another name";
     case IDS_FOLDER_SUFFIX: return L" - Folder";
+    case IDS_RECENT_FOLDERS_LABEL: return L"Recent folders:";
+    case IDS_CLEAR_RECENT_TOOLTIP: return L"Clear recent history";
+    case IDS_NO_RECENT_FOLDERS: return L"(none)";
+    case IDS_CONFLICT_TITLE: return L"File conflict detected";
+    case IDS_CONFLICT_PROMPT: return L"The destination folder already contains files with the same names.";
+    case IDS_CONFLICT_RENAME_OPT: return L"Auto-rename";
+    case IDS_CONFLICT_OVERWRITE_OPT: return L"Overwrite";
     default: return L"";
     }
 }
@@ -229,9 +250,85 @@ void CenterWindow(HWND hwnd, HWND hwndOwner) {
     SetWindowPos(hwnd, NULL, x, y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
+std::vector<std::wstring> GetRecentFolders() {
+    std::vector<std::wstring> list;
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\QuickFolder\\RecentFolders", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD count = 0;
+        DWORD size = sizeof(count);
+        if (RegQueryValueExW(hKey, L"Count", nullptr, nullptr, (LPBYTE)&count, &size) == ERROR_SUCCESS) {
+            if (count > 6) count = 6;
+            for (DWORD i = 0; i < count; ++i) {
+                wchar_t valName[32];
+                swprintf_s(valName, L"Folder%u", i);
+                wchar_t buf[512] = {};
+                DWORD bufSize = sizeof(buf);
+                if (RegQueryValueExW(hKey, valName, nullptr, nullptr, (LPBYTE)buf, &bufSize) == ERROR_SUCCESS) {
+                    if (buf[0] != L'\0') {
+                        list.push_back(buf);
+                    }
+                }
+            }
+        }
+        RegCloseKey(hKey);
+    }
+    return list;
+}
+
+void SaveRecentFolders(const std::vector<std::wstring>& list) {
+    HKEY hKey;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\QuickFolder\\RecentFolders", 0, NULL,
+        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
+        DWORD count = static_cast<DWORD>(list.size() > 6 ? 6 : list.size());
+        RegSetValueExW(hKey, L"Count", 0, REG_DWORD, (const BYTE*)&count, sizeof(count));
+        for (DWORD i = 0; i < count; ++i) {
+            wchar_t valName[32];
+            swprintf_s(valName, L"Folder%u", i);
+            RegSetValueExW(hKey, valName, 0, REG_SZ,
+                (const BYTE*)list[i].c_str(), static_cast<DWORD>((list[i].length() + 1) * sizeof(wchar_t)));
+        }
+        for (DWORD i = count; i < 6; ++i) {
+            wchar_t valName[32];
+            swprintf_s(valName, L"Folder%u", i);
+            RegDeleteValueW(hKey, valName);
+        }
+        RegCloseKey(hKey);
+    }
+}
+
+void AddRecentFolder(const std::wstring& folderName) {
+    if (folderName.empty()) return;
+    auto list = GetRecentFolders();
+    list.erase(std::remove_if(list.begin(), list.end(), [&](const std::wstring& s) {
+        return _wcsicmp(s.c_str(), folderName.c_str()) == 0;
+    }), list.end());
+    list.insert(list.begin(), folderName);
+    if (list.size() > 6) {
+        list.resize(6);
+    }
+    SaveRecentFolders(list);
+}
+
+void ClearRecentFolders() {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\QuickFolder\\RecentFolders", 0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+        for (DWORD i = 0; i < 6; ++i) {
+            wchar_t valName[32];
+            swprintf_s(valName, L"Folder%u", i);
+            RegDeleteValueW(hKey, valName);
+        }
+        DWORD zero = 0;
+        RegSetValueExW(hKey, L"Count", 0, REG_DWORD, (const BYTE*)&zero, sizeof(zero));
+        RegCloseKey(hKey);
+    }
+}
+
 struct DialogState {
     DialogParams* params = nullptr;
     HWND hStaticCount = NULL;
+    HWND hStaticRecent = NULL;
+    HWND hBtnClearRecent = NULL;
+    HWND hBtnRecents[6] = { NULL };
     HWND hStaticPrompt = NULL;
     HWND hEdit = NULL;
     HWND hBtnMove = NULL;
@@ -239,6 +336,8 @@ struct DialogState {
     UINT currentDpi = 96;
     HFONT hFont = NULL;
     HFONT hFontBold = NULL;
+    HFONT hFontSmall = NULL;
+    std::vector<std::wstring> recentFolders;
 };
 
 void UpdateDialogFont(DialogState* state, UINT dpi) {
@@ -250,6 +349,10 @@ void UpdateDialogFont(DialogState* state, UINT dpi) {
     if (state->hFontBold && state->hFontBold != state->hFont) {
         DeleteObject(state->hFontBold);
         state->hFontBold = NULL;
+    }
+    if (state->hFontSmall) {
+        DeleteObject(state->hFontSmall);
+        state->hFontSmall = NULL;
     }
 
     int fontHeight = -MulDiv(9, dpi, 72);
@@ -273,7 +376,25 @@ void UpdateDialogFont(DialogState* state, UINT dpi) {
         state->hFontBold = state->hFont;
     }
 
+    int smallFontHeight = -MulDiv(8, dpi, 72);
+    state->hFontSmall = CreateFontW(
+        smallFontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+        L"Segoe UI"
+    );
+    if (!state->hFontSmall) {
+        state->hFontSmall = state->hFont;
+    }
+
     if (state->hStaticCount) SendMessageW(state->hStaticCount, WM_SETFONT, (WPARAM)state->hFontBold, TRUE);
+    if (state->hStaticRecent) SendMessageW(state->hStaticRecent, WM_SETFONT, (WPARAM)state->hFont, TRUE);
+    if (state->hBtnClearRecent) SendMessageW(state->hBtnClearRecent, WM_SETFONT, (WPARAM)state->hFont, TRUE);
+    for (int i = 0; i < 6; ++i) {
+        if (state->hBtnRecents[i]) {
+            SendMessageW(state->hBtnRecents[i], WM_SETFONT, (WPARAM)state->hFontSmall, TRUE);
+        }
+    }
     if (state->hStaticPrompt) SendMessageW(state->hStaticPrompt, WM_SETFONT, (WPARAM)state->hFont, TRUE);
     if (state->hEdit) SendMessageW(state->hEdit, WM_SETFONT, (WPARAM)state->hFont, TRUE);
     if (state->hBtnMove) SendMessageW(state->hBtnMove, WM_SETFONT, (WPARAM)state->hFont, TRUE);
@@ -286,37 +407,72 @@ void LayoutDialogControls(DialogState* state, UINT dpi) {
         return MulDiv(val, dpi, 96);
     };
 
-    // Client width: 440, height: 170 at 96 DPI
+    // Base client width: 440, height: 232 at 96 DPI
     int padX = Scale(20);
     int contentW = Scale(400);
 
-    // Static count: Y=18, H=20
+    // Static count: Y=14, H=18
     if (state->hStaticCount) {
-        SetWindowPos(state->hStaticCount, NULL, padX, Scale(18), contentW, Scale(20), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(state->hStaticCount, NULL, padX, Scale(14), contentW, Scale(18), SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Static prompt: Y=46, H=18
+    // Recent Folders Header:
+    // Label "Zuletzt verwendet:": X=20, Y=36, W=368, H=18
+    if (state->hStaticRecent) {
+        SetWindowPos(state->hStaticRecent, NULL, padX, Scale(36), Scale(368), Scale(18), SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Trash button: X=440-20-24=396, Y=34, W=24, H=22
+    if (state->hBtnClearRecent) {
+        SetWindowPos(state->hBtnClearRecent, NULL, Scale(396), Scale(34), Scale(24), Scale(22), SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // 6 Recent Buttons: 2 rows of 3 buttons
+    int btnW = Scale(128);
+    int btnH = Scale(24);
+    int gapX = Scale(8);
+
+    int colX[3] = {
+        padX,
+        padX + btnW + gapX,
+        padX + (btnW + gapX) * 2
+    };
+
+    int rowY[2] = {
+        Scale(58),
+        Scale(86)
+    };
+
+    for (int i = 0; i < 6; ++i) {
+        if (state->hBtnRecents[i]) {
+            int r = i / 3;
+            int c = i % 3;
+            SetWindowPos(state->hBtnRecents[i], NULL, colX[c], rowY[r], btnW, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+
+    // Prompt label ("Ordnername:"): Y=118, H=18
     if (state->hStaticPrompt) {
-        SetWindowPos(state->hStaticPrompt, NULL, padX, Scale(46), contentW, Scale(18), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(state->hStaticPrompt, NULL, padX, Scale(118), contentW, Scale(18), SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Edit control: Y=68, H=28
+    // Edit control: Y=138, H=28
     if (state->hEdit) {
-        SetWindowPos(state->hEdit, NULL, padX, Scale(68), contentW, Scale(28), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(state->hEdit, NULL, padX, Scale(138), contentW, Scale(28), SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Buttons: Y=114, H=30, W=100
-    int btnW = Scale(100);
-    int btnH = Scale(30);
-    int btnY = Scale(114);
-    int cancelX = Scale(440) - padX - btnW;
-    int moveX = cancelX - Scale(10) - btnW;
+    // Buttons: Y=182, H=30, W=100
+    int actBtnW = Scale(100);
+    int actBtnH = Scale(30);
+    int actBtnY = Scale(182);
+    int cancelX = Scale(440) - padX - actBtnW;
+    int moveX = cancelX - Scale(10) - actBtnW;
 
     if (state->hBtnMove) {
-        SetWindowPos(state->hBtnMove, NULL, moveX, btnY, btnW, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(state->hBtnMove, NULL, moveX, actBtnY, actBtnW, actBtnH, SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (state->hBtnCancel) {
-        SetWindowPos(state->hBtnCancel, NULL, cancelX, btnY, btnW, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(state->hBtnCancel, NULL, cancelX, actBtnY, actBtnW, actBtnH, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 }
 
@@ -337,9 +493,11 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         UINT dpi = GetWindowDpi(hwnd);
         state->currentDpi = dpi;
 
-        // Ensure window is sized properly for client dimensions at this DPI
+        state->recentFolders = GetRecentFolders();
+
+        // Ensure window is sized properly for client dimensions at this DPI (440 x 232 base)
         int clientW = MulDiv(440, dpi, 96);
-        int clientH = MulDiv(170, dpi, 96);
+        int clientH = MulDiv(232, dpi, 96);
         RECT rc = { 0, 0, clientW, clientH };
         DWORD dwStyle = (DWORD)GetWindowLongPtrW(hwnd, GWL_STYLE);
         DWORD dwExStyle = (DWORD)GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -366,6 +524,45 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
             0, 0, 0, 0,
             hwnd, (HMENU)IDC_STATIC_COUNT, GetModuleHandleW(NULL), NULL
         );
+
+        // Static Recent label
+        std::wstring recentLabel = GetString(IDS_RECENT_FOLDERS_LABEL);
+        if (state->recentFolders.empty()) {
+            recentLabel += L" " + GetString(IDS_NO_RECENT_FOLDERS);
+        }
+        state->hStaticRecent = CreateWindowExW(
+            0, L"STATIC", recentLabel.c_str(),
+            WS_CHILD | WS_VISIBLE | SS_LEFT,
+            0, 0, 0, 0,
+            hwnd, (HMENU)IDC_STATIC_RECENT, GetModuleHandleW(NULL), NULL
+        );
+
+        // Trash button for clearing recent list
+        state->hBtnClearRecent = CreateWindowExW(
+            0, L"BUTTON", L"\xD83D\xDDD1", // 🗑
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+            0, 0, 0, 0,
+            hwnd, (HMENU)IDC_BTN_CLEAR_RECENT, GetModuleHandleW(NULL), NULL
+        );
+        if (state->recentFolders.empty()) {
+            EnableWindow(state->hBtnClearRecent, FALSE);
+        }
+
+        // 6 Recent Folder buttons
+        for (int i = 0; i < 6; ++i) {
+            std::wstring btnText;
+            DWORD bStyle = WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON;
+            if (i < static_cast<int>(state->recentFolders.size())) {
+                btnText = state->recentFolders[i];
+                bStyle |= WS_VISIBLE;
+            }
+            state->hBtnRecents[i] = CreateWindowExW(
+                0, L"BUTTON", btnText.c_str(),
+                bStyle,
+                0, 0, 0, 0,
+                hwnd, (HMENU)(INT_PTR)(IDC_BTN_RECENT_BASE + i), GetModuleHandleW(NULL), NULL
+            );
+        }
 
         state->hStaticPrompt = CreateWindowExW(
             0, L"STATIC", GetString(IDS_FOLDER_NAME_LABEL).c_str(),
@@ -435,6 +632,34 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 
     case WM_COMMAND: {
         int wmId = LOWORD(wParam);
+
+        // Recent folder button clicked
+        if (wmId >= IDC_BTN_RECENT_BASE && wmId < IDC_BTN_RECENT_BASE + 6) {
+            int idx = wmId - IDC_BTN_RECENT_BASE;
+            if (idx < static_cast<int>(state->recentFolders.size())) {
+                SetWindowTextW(state->hEdit, state->recentFolders[idx].c_str());
+                SetFocus(state->hEdit);
+                SendMessageW(state->hEdit, EM_SETSEL, 0, -1);
+            }
+            return 0;
+        }
+
+        // Clear recent folders (trash bin button)
+        if (wmId == IDC_BTN_CLEAR_RECENT) {
+            ClearRecentFolders();
+            state->recentFolders.clear();
+            for (int i = 0; i < 6; ++i) {
+                if (state->hBtnRecents[i]) {
+                    ShowWindow(state->hBtnRecents[i], SW_HIDE);
+                }
+            }
+            std::wstring emptyLabel = GetString(IDS_RECENT_FOLDERS_LABEL) + L" " + GetString(IDS_NO_RECENT_FOLDERS);
+            SetWindowTextW(state->hStaticRecent, emptyLabel.c_str());
+            EnableWindow(state->hBtnClearRecent, FALSE);
+            SetFocus(state->hEdit);
+            return 0;
+        }
+
         if (wmId == IDC_BTN_MOVE) {
             // Read entered folder name
             int len = GetWindowTextLengthW(state->hEdit);
@@ -498,6 +723,10 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                 DeleteObject(state->hFontBold);
                 state->hFontBold = NULL;
             }
+            if (state->hFontSmall && state->hFontSmall != state->hFont) {
+                DeleteObject(state->hFontSmall);
+                state->hFontSmall = NULL;
+            }
         }
         PostQuitMessage(0);
         return 0;
@@ -536,9 +765,9 @@ bool ShowQuickFolderDialog(DialogParams& params) {
     HWND hwndOwner = params.hwndOwner;
     UINT targetDpi = GetMonitorDpi(hwndOwner);
 
-    // Client dimensions: 440 x 170 at 96 DPI
+    // Client dimensions: 440 x 232 at 96 DPI
     int initClientW = MulDiv(440, targetDpi, 96);
-    int initClientH = MulDiv(170, targetDpi, 96);
+    int initClientH = MulDiv(232, targetDpi, 96);
     RECT initRc = { 0, 0, initClientW, initClientH };
     AdjustWindowRectForDpiHelper(&initRc, WS_POPUPWINDOW | WS_CAPTION | WS_CLIPCHILDREN, FALSE, WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, targetDpi);
     int initWinW = initRc.right - initRc.left;
@@ -642,6 +871,86 @@ FileOps::ExistingDestAction PromptExistingFolder(HWND hwndOwner, const std::wstr
     if (msgRes == IDYES) return FileOps::ExistingDestAction::UseExisting;
     if (msgRes == IDNO) return FileOps::ExistingDestAction::ChooseAnother;
     return FileOps::ExistingDestAction::Cancel;
+}
+
+ConflictResolution PromptFileConflict(
+    HWND hwndOwner,
+    size_t conflictCount,
+    const std::wstring& sampleName
+) {
+    std::wstring appTitle = GetString(IDS_APP_TITLE);
+
+    LANGID lang = GetCurrentLangId();
+    std::wstring instruction;
+    std::wstring content;
+    std::wstring optRename;
+    std::wstring optOverwrite;
+
+    if (lang == LANG_GERMAN) {
+        instruction = L"Dateikonflikt erkannt";
+        if (conflictCount == 1) {
+            content = L"Im Zielordner ist bereits eine Datei namens \"" + sampleName + L"\" vorhanden.\nWie möchten Sie vorgehen?";
+        } else {
+            wchar_t buf[256];
+            swprintf_s(buf, L"Im Zielordner sind bereits %zu Dateien mit denselben Namen vorhanden.\nWie möchten Sie vorgehen?", conflictCount);
+            content = buf;
+        }
+        optRename = L"Automatisch umbenennen\nDateien erhalten eine Nummer (z. B. Datei (2).ext)";
+        optOverwrite = L"Überschreiben\nVorhandene Dateien im Zielordner ersetzen";
+    } else if (lang == LANG_RUSSIAN || lang == LANG_UKRAINIAN) {
+        instruction = L"Конфликт имён файлов";
+        if (conflictCount == 1) {
+            content = L"В целевой папке уже есть файл с именем «" + sampleName + L"».\nЧто вы хотите сделать?";
+        } else {
+            wchar_t buf[256];
+            swprintf_s(buf, L"В целевой папке уже существует файлов с совпадающими именами: %zu.\nЧто вы хотите сделать?", conflictCount);
+            content = buf;
+        }
+        optRename = L"Автоматически переименовать\nК именам файлов будет добавлен номер (например, файл (2).ext)";
+        optOverwrite = L"Перезаписать\nЗаменить существующие файлы в целевой папке";
+    } else {
+        instruction = L"File conflict detected";
+        if (conflictCount == 1) {
+            content = L"The destination folder already contains a file named \"" + sampleName + L"\".\nWhat would you like to do?";
+        } else {
+            wchar_t buf[256];
+            swprintf_s(buf, L"The destination folder already contains %zu files with the same names.\nWhat would you like to do?", conflictCount);
+            content = buf;
+        }
+        optRename = L"Auto-rename\nAdd a number to file names (e.g. file (2).ext)";
+        optOverwrite = L"Overwrite\nReplace existing files in the destination folder";
+    }
+
+    TASKDIALOG_BUTTON buttons[] = {
+        { 101, optRename.c_str() },
+        { 102, optOverwrite.c_str() }
+    };
+
+    TASKDIALOGCONFIG tdc = {};
+    tdc.cbSize = sizeof(tdc);
+    tdc.hwndParent = hwndOwner;
+    tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+    tdc.pszWindowTitle = appTitle.c_str();
+    tdc.pszMainIcon = TD_WARNING_ICON;
+    tdc.pszMainInstruction = instruction.c_str();
+    tdc.pszContent = content.c_str();
+    tdc.pButtons = buttons;
+    tdc.cButtons = ARRAYSIZE(buttons);
+    tdc.nDefaultButton = 101;
+
+    int nButton = 0;
+    HRESULT hr = TaskDialogIndirect(&tdc, &nButton, nullptr, nullptr);
+    if (SUCCEEDED(hr)) {
+        if (nButton == 101) return ConflictResolution::AutoRename;
+        if (nButton == 102) return ConflictResolution::Overwrite;
+        return ConflictResolution::Cancel;
+    }
+
+    // Fallback if TaskDialog fails
+    int msgRes = MessageBoxW(hwndOwner, content.c_str(), instruction.c_str(), MB_YESNOCANCEL | MB_ICONWARNING);
+    if (msgRes == IDYES) return ConflictResolution::AutoRename;
+    if (msgRes == IDNO) return ConflictResolution::Overwrite;
+    return ConflictResolution::Cancel;
 }
 
 void ShowErrorMessage(HWND hwndOwner, const std::wstring& message) {

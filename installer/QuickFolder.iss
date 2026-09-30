@@ -2,7 +2,7 @@
 ; High-performance, lightweight Windows Explorer context-menu utility
 
 #define MyAppName "QuickFolder"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "QuickFolder Open Source Project"
 #define MyAppURL "https://github.com/QuickFolder/QuickFolder"
 #define MyAppExeName "QuickFolder.exe"
@@ -21,7 +21,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\dist
-OutputBaseFilename=QuickFolder-Setup-0.1.0
+OutputBaseFilename=QuickFolder-Setup-0.2.0
 SetupIconFile=..\res\QuickFolder.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

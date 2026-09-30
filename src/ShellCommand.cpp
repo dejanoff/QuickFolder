@@ -188,22 +188,14 @@ IFACEMETHODIMP CQuickFolderCommand::Execute() {
             continue;
         }
 
-        // Check if destination folder already exists
+        // Check if destination folder already exists (merges silently without folder-level prompt)
         bool exists = PathUtils::PathExists(destPath);
-        if (exists) {
-            auto action = UI::PromptExistingFolder(m_hwndOwner, params.chosenFolderName);
-            if (action == FileOps::ExistingDestAction::Cancel) {
-                break; // Abort
-            } else if (action == FileOps::ExistingDestAction::ChooseAnother) {
-                suggested = params.chosenFolderName;
-                continue; // Re-open dialog with previous name
-            }
-            // UseExisting -> proceed to move
-        }
 
-        // Execute Move using IFileOperation
+        // Execute Move using IFileOperation (prompts only if files collide)
         auto moveResult = FileOps::ExecuteMove(m_hwndOwner, sourcePaths, destPath, exists);
-        if (!moveResult.success && !moveResult.cancelled) {
+        if (moveResult.success) {
+            UI::AddRecentFolder(params.chosenFolderName);
+        } else if (!moveResult.cancelled) {
             std::wstring err = UI::GetString(IDS_ERR_MOVE_FAILED);
             if (!moveResult.errorMessage.empty()) {
                 err += L"\n" + moveResult.errorMessage;

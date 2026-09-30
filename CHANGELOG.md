@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-09-30
+
+### Added
+- **Recent Folders History (MRU)**:
+  - Displays the 6 most recently used folder names as clickable chip buttons directly above the folder name edit box.
+  - Clicking any recent folder button immediately populates the edit box and selects the text for fast re-use or editing.
+  - History is persisted cleanly in `HKCU\Software\QuickFolder\RecentFolders`.
+- **Trash Bin History Clear Button (`🗑`)**:
+  - Small trash icon button adjacent to recent folders header to wipe recent folder history in one click.
+  - Dynamically updates chip buttons to `(empty)` and disables the trash button once cleared.
+- **Silent Folder Merge**:
+  - If the target folder already exists in the parent directory, selected files are moved into it directly without any redundant warning dialog.
+- **File Collision Handling & Auto-Rename Algorithm**:
+  - Pre-flight check scans destination folder for name collisions before initiating file operations.
+  - If matching filenames exist, displays a localized conflict dialog offering **Auto-rename** (`Automatisch umbenennen` / `Автоматически переименовать`) or **Overwrite** (`Überschreiben` / `Перезаписать`).
+  - Auto-rename algorithm appends incremental numbers (e.g. `file (2).jpg`, `file (3).jpg`) while strictly preserving extensions and handling batch collisions.
+- **Automated Unit Tests**:
+  - Added unit tests for file extension parsing and sequential auto-rename logic (17/17 tests passing).
+
 ## [0.1.0] - 2026-09-30
 
 ### Added

@@ -7,6 +7,9 @@
 #define IDC_STATIC_COUNT            1001
 #define IDC_STATIC_PROMPT           1002
 #define IDC_EDIT_FOLDERNAME         1003
+#define IDC_STATIC_RECENT           1004
+#define IDC_BTN_CLEAR_RECENT        1005
+#define IDC_BTN_RECENT_BASE         1010 // 1010 to 1015 (6 buttons)
 #define IDC_BTN_MOVE                IDOK
 #define IDC_BTN_CANCEL              IDCANCEL
 
@@ -31,3 +34,11 @@
 #define IDS_ERR_TRAILING_CHARS      2018
 #define IDS_ERR_EMPTY_NAME          2019
 #define IDS_ERR_NAME_TOO_LONG       2020
+#define IDS_RECENT_FOLDERS_LABEL    2021
+#define IDS_CLEAR_RECENT_TOOLTIP    2022
+#define IDS_NO_RECENT_FOLDERS       2023
+#define IDS_CONFLICT_TITLE          2024
+#define IDS_CONFLICT_PROMPT         2025
+#define IDS_CONFLICT_RENAME_OPT     2026
+#define IDS_CONFLICT_OVERWRITE_OPT  2027
+

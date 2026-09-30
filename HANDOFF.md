@@ -1,10 +1,11 @@
 # QuickFolder - Agent Handoff Document
 
 ## Current Status
-- **Milestone 1 (MVP) is 100% COMPLETE and fully operational.**
+- **Milestone 2 (v0.2.0) is 100% COMPLETE and fully operational.**
 - Clean native C++20 Win32 application compiled and linked statically with zero external runtime dependencies.
-- Inno Setup installer package built and tested.
-- All 15 automated unit tests passing (`UnitTests.exe`).
+- Inno Setup installer package built and tested (`QuickFolder-Setup-0.2.0.exe`).
+- All 17 automated unit tests passing (`UnitTests.exe`).
+- Recent Folders MRU (6 clickable buttons), trash clear button (`🗑`), silent folder merge, and conflict auto-renaming implemented.
 - Integration tests verified for single file, 20 files, 500 files, 1,000 files, mixed files and subfolders, `.lnk` shortcut files, Unicode (Cyrillic, German umlauts, emoji), long paths (> 260 characters), different parent directory rejection, existing destination handling, silent registration/unregistration, and clean uninstallation.
 - Zero orphan processes left behind after operation.
 
@@ -20,26 +21,32 @@
    - `IExecuteCommand`, `IObjectWithSelection`, and `IObjectWithSite` interfaces fully implemented.
 3. **Safe File Operations (`IFileOperation`)**:
    - Uses Windows Shell file engine for native progress, collision UI ("Replace / Skip / Keep both"), UAC elevation, and Windows Explorer Undo (`Ctrl+Z`).
+   - Destination folder pre-flight collision check: if colliding files exist, prompts user with Auto-Rename (`file (2).ext`) or Overwrite.
+   - Target folders are merged silently without redundant confirmation dialogs.
    - Newly created empty destination folders are automatically cleaned up if operation is aborted or fails.
-4. **Data Protection Invariants**:
+4. **Recent Folders MRU & History Management**:
+   - Displays 6 most recently used folder names as clickable chip buttons above the text box.
+   - Trash button (`🗑`) clears the history instantly.
+   - Persisted cleanly in Windows Registry (`HKCU\Software\QuickFolder\RecentFolders`).
+5. **Data Protection Invariants**:
    - Strict validation of destination folder names (no illegal characters, trailing dots/spaces, relative traversal, or DOS device names like `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
    - Common parent directory verification across selected items (Search Results and multi-root Library views spanning different folders are safely rejected with a clear message).
    - Recursive move prevention (moving a directory inside itself or its subdirectories is disallowed).
    - Shortcuts (`.lnk` and `.url`) are moved as the shortcut files themselves, never resolving or moving target files.
    - Long paths (> 260 chars) handled safely using `\\?\` prefix and manifest `longPathAware`.
    - Current Working Directory is NEVER used as fallback destination.
-5. **Native Win32 UI & Theming**:
-   - Native dialog with item count label, folder name edit control, and Move/Cancel buttons.
+6. **Native Win32 UI & Theming**:
+   - Native dialog with item count label, recent folders chips, trash button, folder name edit control, and Move/Cancel buttons.
    - Keyboard accelerators (`Enter` to Move, `Escape` to Cancel, `Ctrl+A` select all).
-   - Per-Monitor v2 DPI aware (`WM_DPICHANGED` handling).
+   - Per-Monitor v2 DPI aware (`WM_DPICHANGED` handling, dynamic control positioning and font scaling).
    - Automatic Windows Dark Mode detection (`DWMWA_USE_IMMERSIVE_DARK_MODE`).
    - Centered relative to owning Explorer window or active monitor.
    - Multi-language localization (English, German, Russian) loaded dynamically.
-6. **Packaging & Deployment**:
-   - Per-user Inno Setup installer (`dist/QuickFolder-Setup-0.1.0.exe`) requiring no admin privileges.
+7. **Packaging & Deployment**:
+   - Per-user Inno Setup installer (`dist/QuickFolder-Setup-0.2.0.exe`) requiring no admin privileges.
    - Silent installation (`/VERYSILENT /SUPPRESSMSGBOXES`).
    - Clean uninstaller (`unins000.exe`) removes all binaries, COM classes, and registry entries.
-   - Standalone single-file binary (`dist/QuickFolder.exe`, ~1.25 MB).
+   - Standalone single-file binary (`dist/QuickFolder.exe`, ~1.28 MB).
    - Automated build script (`scripts/build.ps1`) and Visual Studio 2022 solution (`QuickFolder.sln`).
 
 ---
@@ -52,14 +59,14 @@
 ---
 
 ## Last Successful Build
-- **Date**: 2026-09-30 (Updated with High-DPI fix)
+- **Date**: 2026-09-30 (v0.2.0)
 - **Compiler**: Clang++ 22.1.8 (LLVM-MinGW UCRT x64, `-std=c++20 -static -O2 -mwindows -municode`)
 - **Resource Compiler**: windres 2.44
 - **Installer Compiler**: Inno Setup 6.7.3 (`ISCC.exe`)
-- **Unit Tests**: 15 Passed, 0 Failed
+- **Unit Tests**: 17 Passed, 0 Failed
 - **Binaries**:
-  - `dist/QuickFolder.exe` (1,257,472 bytes)
-  - `dist/QuickFolder-Setup-0.1.0.exe` (2,354,038 bytes)
+  - `dist/QuickFolder.exe` (1,277,952 bytes)
+  - `dist/QuickFolder-Setup-0.2.0.exe` (2,360,749 bytes)
   - Installed binary at `%LOCALAPPDATA%\Programs\QuickFolder\QuickFolder.exe` updated and active.
 
 ---

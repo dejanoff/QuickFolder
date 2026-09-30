@@ -93,7 +93,9 @@ void ProcessDirectPaths(const std::vector<std::wstring>& paths, const std::wstri
 
         bool exists = QuickFolder::PathUtils::PathExists(destPath);
         auto moveRes = QuickFolder::FileOps::ExecuteMove(NULL, sourcePaths, destPath, exists);
-        if (!moveRes.success && !moveRes.cancelled) {
+        if (moveRes.success) {
+            QuickFolder::UI::AddRecentFolder(explicitFolderName);
+        } else if (!moveRes.cancelled) {
             std::wstring err = UI::GetString(IDS_ERR_MOVE_FAILED);
             if (!moveRes.errorMessage.empty()) {
                 err += L"\n" + moveRes.errorMessage;
@@ -131,18 +133,10 @@ void ProcessDirectPaths(const std::vector<std::wstring>& paths, const std::wstri
         }
 
         bool exists = QuickFolder::PathUtils::PathExists(destPath);
-        if (exists) {
-            auto action = UI::PromptExistingFolder(NULL, params.chosenFolderName);
-            if (action == QuickFolder::FileOps::ExistingDestAction::Cancel) {
-                break;
-            } else if (action == QuickFolder::FileOps::ExistingDestAction::ChooseAnother) {
-                suggested = params.chosenFolderName;
-                continue;
-            }
-        }
-
         auto moveRes = QuickFolder::FileOps::ExecuteMove(NULL, sourcePaths, destPath, exists);
-        if (!moveRes.success && !moveRes.cancelled) {
+        if (moveRes.success) {
+            QuickFolder::UI::AddRecentFolder(params.chosenFolderName);
+        } else if (!moveRes.cancelled) {
             std::wstring err = UI::GetString(IDS_ERR_MOVE_FAILED);
             if (!moveRes.errorMessage.empty()) {
                 err += L"\n" + moveRes.errorMessage;

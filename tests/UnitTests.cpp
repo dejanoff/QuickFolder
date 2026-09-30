@@ -204,6 +204,25 @@ void TestShortcutTreatedAsFilesystemObject() {
     ASSERT_TRUE(lnkSuggest == L"Application");
 }
 
+void TestGetExtension() {
+    ASSERT_TRUE(PathUtils::GetExtension(L"photo.jpg") == L".jpg");
+    ASSERT_TRUE(PathUtils::GetExtension(L"archive.tar.gz") == L".gz");
+    ASSERT_TRUE(PathUtils::GetExtension(L"README") == L"");
+    ASSERT_TRUE(PathUtils::GetExtension(L".gitignore") == L"");
+}
+
+void TestAutoRenameUniqueName() {
+    std::wstring n1 = PathUtils::GenerateUniqueName(L"C:\\TestDirNonExistent", L"D:\\Source\\photo.jpg", { L"photo.jpg" });
+    ASSERT_TRUE(n1 == L"photo (2).jpg");
+
+    std::wstring n2 = PathUtils::GenerateUniqueName(L"C:\\TestDirNonExistent", L"D:\\Source\\photo.jpg", { L"photo.jpg", L"photo (2).jpg" });
+    ASSERT_TRUE(n2 == L"photo (3).jpg");
+
+    // Directory renaming (no extension)
+    std::wstring d1 = PathUtils::GenerateUniqueName(L"C:\\TestDirNonExistent", L"D:\\Source\\Vacation", { L"Vacation" });
+    ASSERT_TRUE(d1 == L"Vacation (2)");
+}
+
 int main() {
     SetConsoleOutputCP(CP_UTF8);
 
@@ -226,6 +245,8 @@ int main() {
     RUN_TEST(TestAbsolutePathConstruction);
     RUN_TEST(TestLongPath);
     RUN_TEST(TestShortcutTreatedAsFilesystemObject);
+    RUN_TEST(TestGetExtension);
+    RUN_TEST(TestAutoRenameUniqueName);
 
     std::cout << "=========================================\n";
     std::cout << " Results: " << g_passCount << " Passed, " << g_failCount << " Failed\n";
