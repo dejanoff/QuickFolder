@@ -33,7 +33,7 @@ A lightweight, high-performance native Windows utility written in C++20 (Win32 /
 ## Installation
 
 ### Standard Setup (Recommended)
-Download the latest `QuickFolder-Setup-0.1.0.exe` from [GitHub Releases](https://github.com/QuickFolder/QuickFolder/releases).
+Download the latest `QuickFolder-Setup-0.1.0.exe` from [GitHub Releases](https://github.com/dejanoff/QuickFolder/releases).
 
 Run the installer:
 - Installs per-user to `%LOCALAPPDATA%\Programs\QuickFolder` by default (no Administrator privileges required).
