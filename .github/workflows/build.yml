@@ -1,0 +1,48 @@
+name: Build & Package QuickFolder
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build x64 Release & Run Tests
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild and Visual Studio
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install Inno Setup
+      run: |
+        choco install innosetup --no-progress -y
+
+    - name: Execute Build Script
+      shell: pwsh
+      run: |
+        .\scripts\build.ps1
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: QuickFolder-x64-Release
+        path: |
+          dist/QuickFolder.exe
+          dist/QuickFolder-Setup-0.1.0.exe
+
+    - name: Create GitHub Release (Tags Only)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          dist/QuickFolder.exe
+          dist/QuickFolder-Setup-0.1.0.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true

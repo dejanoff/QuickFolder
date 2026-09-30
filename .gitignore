@@ -1,0 +1,24 @@
+# Build directories
+build/
+bin/
+obj/
+x64/
+Debug/
+Release/
+
+# Distribution artifacts
+dist/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.VC.opendb
+*.VC.db
+
+# Inno Setup output
+Output/
+
+# Temp & logs
+*.log
+*.tmp
