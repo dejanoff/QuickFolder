@@ -38,3 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Standalone single-file binary with static runtime linking (zero external DLL dependencies).
   - Automated build script (`scripts/build.ps1`) and Visual Studio 2022 solution (`QuickFolder.sln`).
   - Automated unit test suite with 15 test cases covering all edge cases.
+
+### Fixed
+- **UI High-DPI Scaling & Control Clipping**: Fixed issue where the dialog window height was hardcoded to 195px unscaled while child controls scaled with DPI, causing the Edit control and buttons to be clipped/hidden on Windows 11 high-DPI displays (125%, 150%, 200%). Now calculates required client area (440x170 base), scales dimensions using `AdjustWindowRectExForDpi`, applies per-DPI Segoe UI fonts, and auto-focuses the edit control with text selected.
+

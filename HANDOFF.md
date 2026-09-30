@@ -46,19 +46,21 @@
 
 ## What Is Broken / Known Issues
 - None. Build, test suite, and manual integration scenarios all pass with code 0.
+- Resolved: Window truncation bug under Windows 11 high-DPI scaling (125%/150%/200%) where the Edit control and buttons were clipped due to unscaled outer window dimensions. Fixed with dynamic Per-Monitor v2 client sizing and `AdjustWindowRectExForDpi`.
 - Note: Remote SMB UNC network shares and removable media (USB/FAT32/exFAT) could not be physically connected in the virtual agent container and remain documented as `[-] N/A` in `docs/TESTING.md`.
 
 ---
 
 ## Last Successful Build
-- **Date**: 2026-09-30
+- **Date**: 2026-09-30 (Updated with High-DPI fix)
 - **Compiler**: Clang++ 22.1.8 (LLVM-MinGW UCRT x64, `-std=c++20 -static -O2 -mwindows -municode`)
 - **Resource Compiler**: windres 2.44
 - **Installer Compiler**: Inno Setup 6.7.3 (`ISCC.exe`)
 - **Unit Tests**: 15 Passed, 0 Failed
 - **Binaries**:
-  - `dist/QuickFolder.exe` (1,254,912 bytes)
-  - `dist/QuickFolder-Setup-0.1.0.exe` (2,353,074 bytes)
+  - `dist/QuickFolder.exe` (1,257,472 bytes)
+  - `dist/QuickFolder-Setup-0.1.0.exe` (2,354,038 bytes)
+  - Installed binary at `%LOCALAPPDATA%\Programs\QuickFolder\QuickFolder.exe` updated and active.
 
 ---
 

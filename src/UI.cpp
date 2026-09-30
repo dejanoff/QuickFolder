@@ -135,32 +135,86 @@ void ApplyTheme(HWND hwnd) {
     }
 }
 
+UINT GetWindowDpi(HWND hwnd) {
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    if (hUser32) {
+        typedef UINT (WINAPI *PFN_GetDpiForWindow)(HWND);
+        auto pfn = (PFN_GetDpiForWindow)GetProcAddress(hUser32, "GetDpiForWindow");
+        if (pfn && hwnd) {
+            UINT dpi = pfn(hwnd);
+            if (dpi != 0) return dpi;
+        }
+    }
+    HDC hdc = GetDC(hwnd);
+    if (hdc) {
+        UINT dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+        ReleaseDC(hwnd, hdc);
+        if (dpi != 0) return dpi;
+    }
+    return 96;
+}
+
+UINT GetMonitorDpi(HWND hwndOwner) {
+    HMONITOR hMon = NULL;
+    POINT pt = {};
+    GetCursorPos(&pt);
+    hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    if (!hMon && hwndOwner && IsWindow(hwndOwner)) {
+        hMon = MonitorFromWindow(hwndOwner, MONITOR_DEFAULTTONEAREST);
+    }
+
+    HMODULE hShcore = LoadLibraryW(L"shcore.dll");
+    if (hShcore) {
+        typedef HRESULT (WINAPI *PFN_GetDpiForMonitor)(HMONITOR, int, UINT*, UINT*);
+        auto pfn = (PFN_GetDpiForMonitor)GetProcAddress(hShcore, "GetDpiForMonitor");
+        if (pfn && hMon) {
+            UINT dpiX = 96, dpiY = 96;
+            if (SUCCEEDED(pfn(hMon, 0 /* MDT_EFFECTIVE_DPI */, &dpiX, &dpiY))) {
+                FreeLibrary(hShcore);
+                return dpiY ? dpiY : 96;
+            }
+        }
+        FreeLibrary(hShcore);
+    }
+    return 96;
+}
+
+void AdjustWindowRectForDpiHelper(LPRECT prc, DWORD dwStyle, BOOL bMenu, DWORD dwExStyle, UINT dpi) {
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    if (hUser32) {
+        typedef BOOL (WINAPI *PFN_AdjustWindowRectExForDpi)(LPRECT, DWORD, BOOL, DWORD, UINT);
+        auto pfn = (PFN_AdjustWindowRectExForDpi)GetProcAddress(hUser32, "AdjustWindowRectExForDpi");
+        if (pfn) {
+            if (pfn(prc, dwStyle, bMenu, dwExStyle, dpi)) {
+                return;
+            }
+        }
+    }
+    AdjustWindowRectEx(prc, dwStyle, bMenu, dwExStyle);
+}
+
 void CenterWindow(HWND hwnd, HWND hwndOwner) {
     RECT rcDlg = {};
     GetWindowRect(hwnd, &rcDlg);
     int dlgWidth = rcDlg.right - rcDlg.left;
     int dlgHeight = rcDlg.bottom - rcDlg.top;
 
-    HMONITOR hMon = NULL;
-    RECT rcTarget = {};
+    POINT ptCursor = {};
+    GetCursorPos(&ptCursor);
 
-    if (hwndOwner && IsWindow(hwndOwner) && IsWindowVisible(hwndOwner)) {
-        GetWindowRect(hwndOwner, &rcTarget);
+    HMONITOR hMon = MonitorFromPoint(ptCursor, MONITOR_DEFAULTTONEAREST);
+    if (!hMon && hwndOwner && IsWindow(hwndOwner)) {
         hMon = MonitorFromWindow(hwndOwner, MONITOR_DEFAULTTONEAREST);
-    } else {
-        POINT ptCursor = {};
-        GetCursorPos(&ptCursor);
-        hMon = MonitorFromPoint(ptCursor, MONITOR_DEFAULTTONEAREST);
     }
 
     MONITORINFO mi = {};
     mi.cbSize = sizeof(mi);
+    RECT rcTarget = {};
     if (hMon && GetMonitorInfoW(hMon, &mi)) {
-        if (!hwndOwner || !IsWindow(hwndOwner) || !IsWindowVisible(hwndOwner)) {
-            rcTarget = mi.rcWork;
-        }
+        rcTarget = mi.rcWork;
     } else {
         SystemParametersInfoW(SPI_GETWORKAREA, 0, &rcTarget, 0);
+        mi.rcWork = rcTarget;
     }
 
     int x = rcTarget.left + ((rcTarget.right - rcTarget.left) - dlgWidth) / 2;
@@ -183,7 +237,88 @@ struct DialogState {
     HWND hBtnMove = NULL;
     HWND hBtnCancel = NULL;
     UINT currentDpi = 96;
+    HFONT hFont = NULL;
+    HFONT hFontBold = NULL;
 };
+
+void UpdateDialogFont(DialogState* state, UINT dpi) {
+    if (!state) return;
+    if (state->hFont) {
+        DeleteObject(state->hFont);
+        state->hFont = NULL;
+    }
+    if (state->hFontBold && state->hFontBold != state->hFont) {
+        DeleteObject(state->hFontBold);
+        state->hFontBold = NULL;
+    }
+
+    int fontHeight = -MulDiv(9, dpi, 72);
+    state->hFont = CreateFontW(
+        fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+        L"Segoe UI"
+    );
+    if (!state->hFont) {
+        state->hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+    }
+
+    state->hFontBold = CreateFontW(
+        fontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+        L"Segoe UI"
+    );
+    if (!state->hFontBold) {
+        state->hFontBold = state->hFont;
+    }
+
+    if (state->hStaticCount) SendMessageW(state->hStaticCount, WM_SETFONT, (WPARAM)state->hFontBold, TRUE);
+    if (state->hStaticPrompt) SendMessageW(state->hStaticPrompt, WM_SETFONT, (WPARAM)state->hFont, TRUE);
+    if (state->hEdit) SendMessageW(state->hEdit, WM_SETFONT, (WPARAM)state->hFont, TRUE);
+    if (state->hBtnMove) SendMessageW(state->hBtnMove, WM_SETFONT, (WPARAM)state->hFont, TRUE);
+    if (state->hBtnCancel) SendMessageW(state->hBtnCancel, WM_SETFONT, (WPARAM)state->hFont, TRUE);
+}
+
+void LayoutDialogControls(DialogState* state, UINT dpi) {
+    if (!state) return;
+    auto Scale = [dpi](int val) -> int {
+        return MulDiv(val, dpi, 96);
+    };
+
+    // Client width: 440, height: 170 at 96 DPI
+    int padX = Scale(20);
+    int contentW = Scale(400);
+
+    // Static count: Y=18, H=20
+    if (state->hStaticCount) {
+        SetWindowPos(state->hStaticCount, NULL, padX, Scale(18), contentW, Scale(20), SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Static prompt: Y=46, H=18
+    if (state->hStaticPrompt) {
+        SetWindowPos(state->hStaticPrompt, NULL, padX, Scale(46), contentW, Scale(18), SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Edit control: Y=68, H=28
+    if (state->hEdit) {
+        SetWindowPos(state->hEdit, NULL, padX, Scale(68), contentW, Scale(28), SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Buttons: Y=114, H=30, W=100
+    int btnW = Scale(100);
+    int btnH = Scale(30);
+    int btnY = Scale(114);
+    int cancelX = Scale(440) - padX - btnW;
+    int moveX = cancelX - Scale(10) - btnW;
+
+    if (state->hBtnMove) {
+        SetWindowPos(state->hBtnMove, NULL, moveX, btnY, btnW, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (state->hBtnCancel) {
+        SetWindowPos(state->hBtnCancel, NULL, cancelX, btnY, btnW, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
 
 static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     DialogState* state = reinterpret_cast<DialogState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -199,17 +334,20 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
     case WM_CREATE: {
         ApplyTheme(hwnd);
 
-        // Calculate scaling factor from DPI
-        UINT dpi = 96;
-        HDC hdc = GetDC(hwnd);
-        if (hdc) {
-            dpi = GetDeviceCaps(hdc, LOGPIXELSY);
-            ReleaseDC(hwnd, hdc);
-        }
+        UINT dpi = GetWindowDpi(hwnd);
         state->currentDpi = dpi;
-        auto Scale = [dpi](int val) -> int {
-            return MulDiv(val, dpi, 96);
-        };
+
+        // Ensure window is sized properly for client dimensions at this DPI
+        int clientW = MulDiv(440, dpi, 96);
+        int clientH = MulDiv(170, dpi, 96);
+        RECT rc = { 0, 0, clientW, clientH };
+        DWORD dwStyle = (DWORD)GetWindowLongPtrW(hwnd, GWL_STYLE);
+        DWORD dwExStyle = (DWORD)GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        AdjustWindowRectForDpiHelper(&rc, dwStyle, FALSE, dwExStyle, dpi);
+
+        int winW = rc.right - rc.left;
+        int winH = rc.bottom - rc.top;
+        SetWindowPos(hwnd, NULL, 0, 0, winW, winH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
         // Item count label text
         std::wstring countStr;
@@ -225,44 +363,41 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         state->hStaticCount = CreateWindowExW(
             0, L"STATIC", countStr.c_str(),
             WS_CHILD | WS_VISIBLE | SS_LEFT,
-            Scale(18), Scale(16), Scale(360), Scale(20),
+            0, 0, 0, 0,
             hwnd, (HMENU)IDC_STATIC_COUNT, GetModuleHandleW(NULL), NULL
         );
 
         state->hStaticPrompt = CreateWindowExW(
             0, L"STATIC", GetString(IDS_FOLDER_NAME_LABEL).c_str(),
             WS_CHILD | WS_VISIBLE | SS_LEFT,
-            Scale(18), Scale(46), Scale(360), Scale(18),
+            0, 0, 0, 0,
             hwnd, (HMENU)IDC_STATIC_PROMPT, GetModuleHandleW(NULL), NULL
         );
 
         state->hEdit = CreateWindowExW(
             WS_EX_CLIENTEDGE, L"EDIT", state->params->suggestedName.c_str(),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
-            Scale(18), Scale(68), Scale(360), Scale(26),
+            0, 0, 0, 0,
             hwnd, (HMENU)IDC_EDIT_FOLDERNAME, GetModuleHandleW(NULL), NULL
         );
 
         state->hBtnMove = CreateWindowExW(
             0, L"BUTTON", GetString(IDS_BTN_MOVE_TEXT).c_str(),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-            Scale(186), Scale(110), Scale(92), Scale(28),
+            0, 0, 0, 0,
             hwnd, (HMENU)IDC_BTN_MOVE, GetModuleHandleW(NULL), NULL
         );
 
         state->hBtnCancel = CreateWindowExW(
             0, L"BUTTON", GetString(IDS_BTN_CANCEL_TEXT).c_str(),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-            Scale(286), Scale(110), Scale(92), Scale(28),
+            0, 0, 0, 0,
             hwnd, (HMENU)IDC_BTN_CANCEL, GetModuleHandleW(NULL), NULL
         );
 
-        // Apply fonts
-        SendMessageW(state->hStaticCount, WM_SETFONT, (WPARAM)g_hFont, TRUE);
-        SendMessageW(state->hStaticPrompt, WM_SETFONT, (WPARAM)g_hFont, TRUE);
-        SendMessageW(state->hEdit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
-        SendMessageW(state->hBtnMove, WM_SETFONT, (WPARAM)g_hFont, TRUE);
-        SendMessageW(state->hBtnCancel, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+        // Apply DPI fonts and layout
+        UpdateDialogFont(state, dpi);
+        LayoutDialogControls(state, dpi);
 
         // Set focus to Edit box and pre-select all text
         SetFocus(state->hEdit);
@@ -331,6 +466,22 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         break;
     }
 
+    case WM_DPICHANGED: {
+        UINT newDpi = HIWORD(wParam);
+        state->currentDpi = newDpi;
+        RECT* prcNew = reinterpret_cast<RECT*>(lParam);
+        SetWindowPos(hwnd, NULL,
+            prcNew->left, prcNew->top,
+            prcNew->right - prcNew->left,
+            prcNew->bottom - prcNew->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+
+        UpdateDialogFont(state, newDpi);
+        LayoutDialogControls(state, newDpi);
+        InvalidateRect(hwnd, NULL, TRUE);
+        return 0;
+    }
+
     case WM_CLOSE: {
         state->params->confirmed = false;
         DestroyWindow(hwnd);
@@ -338,6 +489,16 @@ static LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
     }
 
     case WM_DESTROY: {
+        if (state) {
+            if (state->hFont) {
+                DeleteObject(state->hFont);
+                state->hFont = NULL;
+            }
+            if (state->hFontBold && state->hFontBold != state->hFont) {
+                DeleteObject(state->hFontBold);
+                state->hFontBold = NULL;
+            }
+        }
         PostQuitMessage(0);
         return 0;
     }
@@ -372,17 +533,23 @@ bool ShowQuickFolderDialog(DialogParams& params) {
     DialogState state;
     state.params = &params;
 
-    // Initial base window size (approx 400x190 at 96 DPI)
-    int baseWidth = 405;
-    int baseHeight = 195;
-
     HWND hwndOwner = params.hwndOwner;
+    UINT targetDpi = GetMonitorDpi(hwndOwner);
+
+    // Client dimensions: 440 x 170 at 96 DPI
+    int initClientW = MulDiv(440, targetDpi, 96);
+    int initClientH = MulDiv(170, targetDpi, 96);
+    RECT initRc = { 0, 0, initClientW, initClientH };
+    AdjustWindowRectForDpiHelper(&initRc, WS_POPUPWINDOW | WS_CAPTION | WS_CLIPCHILDREN, FALSE, WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, targetDpi);
+    int initWinW = initRc.right - initRc.left;
+    int initWinH = initRc.bottom - initRc.top;
+
     HWND hwnd = CreateWindowExW(
         WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
         CLASS_NAME,
         GetString(IDS_APP_TITLE).c_str(),
         WS_POPUPWINDOW | WS_CAPTION | WS_CLIPCHILDREN,
-        CW_USEDEFAULT, CW_USEDEFAULT, baseWidth, baseHeight,
+        CW_USEDEFAULT, CW_USEDEFAULT, initWinW, initWinH,
         hwndOwner, NULL, hInstance, &state
     );
 
@@ -394,6 +561,13 @@ bool ShowQuickFolderDialog(DialogParams& params) {
     CenterWindow(hwnd, hwndOwner);
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
+
+    // Bring to foreground and focus edit box with all text selected
+    SetForegroundWindow(hwnd);
+    if (state.hEdit) {
+        SetFocus(state.hEdit);
+        SendMessageW(state.hEdit, EM_SETSEL, 0, -1);
+    }
 
     // Disable owner window while modal dialog is active
     if (hwndOwner && IsWindow(hwndOwner)) {
