@@ -60,14 +60,16 @@
 ---
 
 ## Last Successful Build
-- **Date**: 2026-09-30 (v0.2.1)
+- **Date**: 2026-10-01 (v0.2.1)
 - **Compiler**: Clang++ 22.1.8 (LLVM-MinGW UCRT x64, `-std=c++20 -static -O2 -mwindows -municode`)
 - **Resource Compiler**: windres 2.44
 - **Installer Compiler**: Inno Setup 6.7.3 (`ISCC.exe`)
+- **CI / CD**: GitHub Actions (`.github/workflows/build.yml`) 100% green (`master` & `v0.2.1`).
 - **Unit Tests**: 17 Passed, 0 Failed
-- **Binaries**:
+- **Binaries & Release**:
   - `dist/QuickFolder.exe`
   - `dist/QuickFolder-Setup-0.2.1.exe`
+  - Published Release: https://github.com/dejanoff/QuickFolder/releases/tag/v0.2.1
   - Installed binary at `%LOCALAPPDATA%\Programs\QuickFolder\QuickFolder.exe` updated and active.
 
 ---
