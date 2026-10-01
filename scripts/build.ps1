@@ -15,21 +15,25 @@ $rootDir = Split-Path -Parent $PSScriptRoot
 Set-Location $rootDir
 
 # 1. Locate Compilers and Tools
-$clangPath = "C:\Users\Dejan\AppData\Local\Microsoft\WinGet\Packages\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\llvm-mingw-20260616-ucrt-x86_64\bin\clang++.exe"
-$windresPath = "C:\Users\Dejan\AppData\Local\Microsoft\WinGet\Packages\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\llvm-mingw-20260616-ucrt-x86_64\bin\windres.exe"
-$isccPath = "C:\Users\Dejan\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
+$foundClang = Get-Command "clang++" -ErrorAction SilentlyContinue
+if ($foundClang) {
+    $clangPath = $foundClang.Source
+} else {
+    $clangPath = "C:\Users\Dejan\AppData\Local\Microsoft\WinGet\Packages\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\llvm-mingw-20260616-ucrt-x86_64\bin\clang++.exe"
+}
 
-if (-not (Test-Path $clangPath)) {
-    $found = Get-Command "clang++" -ErrorAction SilentlyContinue
-    if ($found) { $clangPath = $found.Source }
+$foundWindres = Get-Command "windres" -ErrorAction SilentlyContinue
+if ($foundWindres) {
+    $windresPath = $foundWindres.Source
+} else {
+    $windresPath = "C:\Users\Dejan\AppData\Local\Microsoft\WinGet\Packages\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\llvm-mingw-20260616-ucrt-x86_64\bin\windres.exe"
 }
-if (-not (Test-Path $windresPath)) {
-    $found = Get-Command "windres" -ErrorAction SilentlyContinue
-    if ($found) { $windresPath = $found.Source }
-}
-if (-not (Test-Path $isccPath)) {
-    $found = Get-Command "iscc" -ErrorAction SilentlyContinue
-    if ($found) { $isccPath = $found.Source }
+
+$foundIscc = Get-Command "iscc" -ErrorAction SilentlyContinue
+if ($foundIscc) {
+    $isccPath = $foundIscc.Source
+} else {
+    $isccPath = "C:\Users\Dejan\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
 }
 
 Write-Host "C++ Compiler: $clangPath"
@@ -97,7 +101,7 @@ if (-not $SkipInstaller -and (Test-Path $isccPath)) {
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE"
     }
-    $setupItem = Get-Item "dist\QuickFolder-Setup-0.2.1.exe"
+    $setupItem = Get-Item "dist\QuickFolder-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     Write-Host "Installer built successfully: $($setupItem.FullName) ($($setupItem.Length) bytes)" -ForegroundColor Green
 } else {
     Write-Host "`n[5/5] Skipping installer compilation." -ForegroundColor Gray
